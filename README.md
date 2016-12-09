@@ -1,4 +1,5 @@
 # A mutex implementation with TryLock
+![gosync.svg](https://travis-ci.org/lrita/gosync.svg?branch=master)
 
 ## interface
 ```
