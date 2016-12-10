@@ -73,6 +73,7 @@ func (m *mutex) TryLockContext(ctx context.Context) bool {
 type MutexGroup interface {
 	Lock(i interface{})
 	UnLock(i interface{})
+	UnLockAndFree(i interface{})
 	// TryLock return true if it fetch mutex
 	TryLock(i interface{}) bool
 	// TryLockTimeout return true if it fetch mutex, return false if timeout
@@ -107,6 +108,20 @@ func (m *mutexGroup) Lock(i interface{}) {
 
 func (m *mutexGroup) UnLock(i interface{}) {
 	m.get(i).UnLock()
+}
+
+func (m *mutexGroup) UnLockAndFree(i interface{}) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	mu, ok := m.group[i]
+	if !ok {
+		if PanicOnBug {
+			panic("unlock of unlocked mutex")
+		}
+		return
+	}
+	delete(m.group, i)
+	mu.UnLock()
 }
 
 func (m *mutexGroup) TryLock(i interface{}) bool {
