@@ -32,6 +32,22 @@ func TestMutexTryLockTimeout(t *testing.T) {
 	mu.UnLock()
 }
 
+func TestMutexUnlockTwice(t *testing.T) {
+	mu := NewMutex()
+	mu.Lock()
+	defer func() {
+		if x := recover(); x != nil {
+			if x != "unlock of unlocked mutex" {
+				t.Errorf("unexpect panic")
+			}
+		} else {
+			t.Errorf("should panic after unlock twice")
+		}
+	}()
+	mu.UnLock()
+	mu.UnLock()
+}
+
 func TestMutexTryLockContext(t *testing.T) {
 	mu := NewMutex()
 	ctx, cancel := context.WithCancel(context.Background())

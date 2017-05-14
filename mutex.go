@@ -22,7 +22,9 @@ type Mutex interface {
 }
 
 func NewMutex() Mutex {
-	return &mutex{ch: make(chan struct{}, 1)}
+	m := &mutex{ch: make(chan struct{}, 1)}
+	m.ch <- struct{}{}
+	return m
 }
 
 type mutex struct {
@@ -30,12 +32,12 @@ type mutex struct {
 }
 
 func (m *mutex) Lock() {
-	m.ch <- struct{}{}
+	<-m.ch
 }
 
 func (m *mutex) UnLock() {
 	select {
-	case <-m.ch:
+	case m.ch <- struct{}{}:
 	default:
 		if PanicOnBug {
 			panic("unlock of unlocked mutex")
@@ -45,7 +47,7 @@ func (m *mutex) UnLock() {
 
 func (m *mutex) TryLock() bool {
 	select {
-	case m.ch <- struct{}{}:
+	case <-m.ch:
 		return true
 	default:
 	}
@@ -54,7 +56,7 @@ func (m *mutex) TryLock() bool {
 
 func (m *mutex) TryLockTimeout(timeout time.Duration) bool {
 	select {
-	case m.ch <- struct{}{}:
+	case <-m.ch:
 		return true
 	case <-time.After(timeout):
 	}
@@ -63,7 +65,7 @@ func (m *mutex) TryLockTimeout(timeout time.Duration) bool {
 
 func (m *mutex) TryLockContext(ctx context.Context) bool {
 	select {
-	case m.ch <- struct{}{}:
+	case <-m.ch:
 		return true
 	case <-ctx.Done():
 	}
