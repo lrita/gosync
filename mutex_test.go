@@ -3,6 +3,7 @@ package sync
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 )
@@ -87,6 +88,62 @@ func TestMutexGroup(t *testing.T) {
 	defer mu.UnLock("g")
 	if mu.TryLock("g") {
 		t.Errorf("cannot fetch mutex !!!")
+	}
+}
+
+func TestMutexGroupMutliWaitLock(t *testing.T) {
+	var (
+		wg sync.WaitGroup
+		mu = NewMutexGroup()
+		cn = 3
+	)
+
+	for i := 0; i < cn; i++ {
+		wg.Add(1)
+		go func() {
+			mu.Lock("h")
+			time.Sleep(1e7)
+			mu.UnLock("h")
+			wg.Done()
+		}()
+	}
+	wg.Wait()
+
+	for i := 0; i < cn; i++ {
+		wg.Add(1)
+		go func() {
+			mu.Lock("g")
+			time.Sleep(1e7)
+			mu.UnLockAndFree("g")
+			wg.Done()
+		}()
+	}
+	wg.Wait()
+}
+
+func TestMutexGroupUnLockAndFree(t *testing.T) {
+	var (
+		wg sync.WaitGroup
+		mu = NewMutexGroup()
+		mg = mu.(*mutexGroup)
+	)
+
+	for j := 1; j < 5; j++ {
+		for i := 0; i < j; i++ {
+			wg.Add(1)
+			go func() {
+				mu.Lock("h")
+				time.Sleep(1e6)
+				mu.UnLockAndFree("h")
+				wg.Done()
+			}()
+		}
+		wg.Wait()
+		mg.mu.Lock()
+		if _, ok := mg.group["h"]; ok {
+			t.Error("h mutex exist after UnLockAndFree")
+		}
+		mg.mu.Unlock()
 	}
 }
 

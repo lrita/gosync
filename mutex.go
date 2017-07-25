@@ -85,55 +85,73 @@ type MutexGroup interface {
 }
 
 func NewMutexGroup() MutexGroup {
-	return &mutexGroup{group: make(map[interface{}]Mutex)}
+	return &mutexGroup{group: make(map[interface{}]*entry)}
 }
 
 type mutexGroup struct {
 	mu    sync.Mutex
-	group map[interface{}]Mutex
+	group map[interface{}]*entry
 }
 
-func (m *mutexGroup) get(i interface{}) Mutex {
+type entry struct {
+	ref int
+	mu  Mutex
+}
+
+func (m *mutexGroup) get(i interface{}, ref int) Mutex {
 	m.mu.Lock()
-	mu, ok := m.group[i]
+	defer m.mu.Unlock()
+	en, ok := m.group[i]
 	if !ok {
-		mu = NewMutex()
-		m.group[i] = mu
+		if ref > 0 {
+			en = &entry{mu: NewMutex()}
+			m.group[i] = en
+		} else if PanicOnBug {
+			panic("unlock of unlocked mutex")
+		} else {
+			return nil
+		}
 	}
-	m.mu.Unlock()
-	return mu
+	en.ref += ref
+	return en.mu
 }
 
 func (m *mutexGroup) Lock(i interface{}) {
-	m.get(i).Lock()
+	m.get(i, 1).Lock()
 }
 
 func (m *mutexGroup) UnLock(i interface{}) {
-	m.get(i).UnLock()
+	mu := m.get(i, -1)
+	if mu != nil {
+		mu.UnLock()
+	}
 }
 
 func (m *mutexGroup) UnLockAndFree(i interface{}) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	mu, ok := m.group[i]
+	en, ok := m.group[i]
 	if !ok {
 		if PanicOnBug {
 			panic("unlock of unlocked mutex")
 		}
 		return
 	}
-	delete(m.group, i)
-	mu.UnLock()
+	en.ref--
+	if en.ref == 0 {
+		delete(m.group, i)
+	}
+	en.mu.UnLock()
 }
 
 func (m *mutexGroup) TryLock(i interface{}) bool {
-	return m.get(i).TryLock()
+	return m.get(i, 1).TryLock()
 }
 
 func (m *mutexGroup) TryLockTimeout(i interface{}, timeout time.Duration) bool {
-	return m.get(i).TryLockTimeout(timeout)
+	return m.get(i, 1).TryLockTimeout(timeout)
 }
 
 func (m *mutexGroup) TryLockContext(i interface{}, ctx context.Context) bool {
-	return m.get(i).TryLockContext(ctx)
+	return m.get(i, 1).TryLockContext(ctx)
 }
