@@ -145,13 +145,25 @@ func (m *mutexGroup) UnLockAndFree(i interface{}) {
 }
 
 func (m *mutexGroup) TryLock(i interface{}) bool {
-	return m.get(i, 1).TryLock()
+	locked := m.get(i, 1).TryLock()
+	if !locked {
+		m.get(i, -1)
+	}
+	return locked
 }
 
 func (m *mutexGroup) TryLockTimeout(i interface{}, timeout time.Duration) bool {
-	return m.get(i, 1).TryLockTimeout(timeout)
+	locked := m.get(i, 1).TryLockTimeout(timeout)
+	if !locked {
+		m.get(i, -1)
+	}
+	return locked
 }
 
 func (m *mutexGroup) TryLockContext(i interface{}, ctx context.Context) bool {
-	return m.get(i, 1).TryLockContext(ctx)
+	locked := m.get(i, 1).TryLockContext(ctx)
+	if !locked {
+		m.get(i, -1)
+	}
+	return locked
 }

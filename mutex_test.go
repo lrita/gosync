@@ -147,6 +147,33 @@ func TestMutexGroupUnLockAndFree(t *testing.T) {
 	}
 }
 
+func TestMutexGroupTryLockFailedAndUnLockAndFree(t *testing.T) {
+	var (
+		wg sync.WaitGroup
+		mu = NewMutexGroup()
+		mg = mu.(*mutexGroup)
+	)
+
+	for j := 1; j < 5; j++ {
+		for i := 0; i < j; i++ {
+			wg.Add(1)
+			go func() {
+				if mu.TryLock("h") {
+					time.Sleep(1e6)
+					mu.UnLockAndFree("h")
+				}
+				wg.Done()
+			}()
+		}
+		wg.Wait()
+		mg.mu.Lock()
+		if _, ok := mg.group["h"]; ok {
+			t.Error("h mutex exist after UnLockAndFree")
+		}
+		mg.mu.Unlock()
+	}
+}
+
 func TestMutexGroupTryLockTimeout(t *testing.T) {
 	mu := NewMutexGroup()
 	mu.Lock("g")
