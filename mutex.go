@@ -55,10 +55,12 @@ func (m *mutex) TryLock() bool {
 }
 
 func (m *mutex) TryLockTimeout(timeout time.Duration) bool {
+	tm := time.NewTimer(timeout)
 	select {
 	case <-m.ch:
+		tm.Stop()
 		return true
-	case <-time.After(timeout):
+	case <-tm.C:
 	}
 	return false
 }
